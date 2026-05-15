@@ -45,26 +45,34 @@ body {
 
 .view-controls {
     position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 20px;
+    right: 20px;
     display: flex;
-    gap: 10px;
-    z-index: 100;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 1000;
 }
 
-.view-controls button {
-    padding: 8px 18px;
+.control-btn {
+    padding: 10px 20px;
     font-size: 14px;
+    font-weight: bold;
     border: none;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.7);
-    color: #fff;
+    border-radius: 20px;
+    background: #f0f0f0;
+    color: #333;
     cursor: pointer;
-    backdrop-filter: blur(8px);
-    transition: background 0.2s;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    min-width: 100px;
 }
 
-.view-controls button:hover {
-    background: rgba(74, 144, 217, 0.8);
+.control-btn:hover {
+    background: #e0e0e0;
+    transform: translateY(-2px);
+}
+
+.control-btn.active {
+    background: #4A90D9;
+    color: white;
 }

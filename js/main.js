@@ -1,7 +1,9 @@
 // ========== 全局变量 ==========
 var scene, camera, renderer, controls;
+var perspectiveCamera, birdCamera; // 定义两个相机
 var buildingsGroup, treesGroup, roadsGroup;
 var infoPanel;
+var currentView = 'perspective'; // 当前视角状态
 
 // ========== 坐标缩放常量 ==========
 // JSON 坐标范围约 x:[-162,170] z:[-178,150]，缩放 0.3 后约 x:[-49,51] z:[-53,45]
@@ -93,13 +95,28 @@ function initScene() {
 
 // ========== 相机初始化 ==========
 function initCamera() {
-    camera = new THREE.PerspectiveCamera(
+    // 1. 初始化透视相机 (Perspective View)
+    perspectiveCamera = new THREE.PerspectiveCamera(
         60,
         window.innerWidth / window.innerHeight,
         0.1,
         1000
     );
-    camera.position.set(0, 45, -85);
+    perspectiveCamera.position.set(0, 45, -85);
+
+    // 2. 初始化鸟瞰相机 (Bird View - 正上方俯视)
+    birdCamera = new THREE.PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+    );
+    // 高度 y=30 (根据场景 SCALE=0.3 调整原需求 y=3 为 y=30 以获得合适范围)
+    birdCamera.position.set(0, 30, -30); 
+    birdCamera.lookAt(0, 0, -30);
+
+    // 默认使用透视相机
+    camera = perspectiveCamera;
 }
 
 // ========== 渲染器初始化 ==========
@@ -632,6 +649,14 @@ function createGroundCoordLabel(x, z, text) {
 // ========== 事件绑定 ==========
 function bindEvents() {
     window.addEventListener('resize', onWindowResize, false);
+
+    // 绑定视角切换按钮事件
+    document.getElementById('btn-perspective').addEventListener('click', function() {
+        toggleView('perspective');
+    });
+    document.getElementById('btn-birdview').addEventListener('click', function() {
+        toggleView('bird');
+    });
 }
 
 // ========== 窗口大小自适应 ==========
@@ -653,9 +678,47 @@ function loadGLBModel(url, position) {
     console.log('GLB 模型加载功能待实现:', url, position);
 }
 
-// ========== 扩展预留：视角切换 ==========
+// ========== 视角切换功能实现 ==========
+/**
+ * 切换场景视角
+ * @param {string} mode - 'perspective' 或 'bird'
+ */
 function toggleView(mode) {
-    console.log('视角切换功能待实现:', mode);
+    if (currentView === mode) return;
+    currentView = mode;
+
+    // 更新按钮状态
+    document.getElementById('btn-perspective').classList.toggle('active', mode === 'perspective');
+    document.getElementById('btn-birdview').classList.toggle('active', mode === 'bird');
+
+    if (mode === 'perspective') {
+        // 切换到透视视角
+        camera = perspectiveCamera;
+        controls.object = camera; // 重新绑定控制器相机
+        
+        // 恢复控制器限制
+        controls.enableRotate = true;
+        controls.maxPolarAngle = Math.PI / 2.1;
+        controls.minPolarAngle = 0;
+        
+        // 设置一个较好的初始观察角度
+        camera.position.set(0, 45, -85);
+        controls.target.set(0, 0, -30);
+    } else {
+        // 切换到鸟瞰视角
+        camera = birdCamera;
+        controls.object = camera; // 重新绑定控制器相机
+        
+        // 锁定旋转：禁止水平旋转和垂直旋转
+        controls.enableRotate = false;
+        
+        // 强制俯视：设置相机位置和目标
+        camera.position.set(0, 30, -30);
+        controls.target.set(0, 0, -30);
+    }
+    
+    controls.update();
+    console.log('视角已切换至:', mode === 'perspective' ? '透视视角' : '鸟瞰视角');
 }
 
 // ========== 扩展预留：图层显隐控制 ==========
