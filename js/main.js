@@ -1,9 +1,27 @@
 // ========== 全局变量 ==========
 var scene, camera, renderer, controls;
 var perspectiveCamera, birdCamera; // 定义两个相机
-var buildingsGroup, treesGroup, roadsGroup;
+var buildingsGroup, treesGroup, roadsGroup, labelsGroup;
 var infoPanel;
 var currentView = 'perspective'; // 当前视角状态
+var labelsVisible = true; // 标签显示状态
+
+// ========== 交互相关变量 ==========
+var raycaster = new THREE.Raycaster();
+var mouse = new THREE.Vector2();
+var hoveredObject = null; // 当前鼠标悬停的对象
+var isAnimating = false; // 是否正在进行相机过渡动画
+var HIGHLIGHT_COLOR = 0xFFFF00; // 悬停高亮色 (黄色)
+
+// ========== 键盘控制状态 ==========
+var moveState = {
+    forward: false,
+    backward: false,
+    left: false,
+    right: false
+};
+var moveSpeed = 0.5;
+var rotateSpeed = 0.03;
 
 // ========== 坐标缩放常量 ==========
 // JSON 坐标范围约 x:[-162,170] z:[-178,150]，缩放 0.3 后约 x:[-49,51] z:[-53,45]
@@ -65,6 +83,7 @@ var BUILDING_DATA = [
 
 // ========== 主初始化函数 ==========
 function init() {
+    infoPanel = document.getElementById('info-panel'); // 获取信息面板引用
     initScene();
     initCamera();
     initRenderer();
@@ -88,34 +107,37 @@ function initScene() {
     buildingsGroup = new THREE.Group();
     treesGroup = new THREE.Group();
     roadsGroup = new THREE.Group();
+    labelsGroup = new THREE.Group(); // 初始化标签组
     scene.add(buildingsGroup);
     scene.add(treesGroup);
     scene.add(roadsGroup);
+    scene.add(labelsGroup);
 }
 
 // ========== 相机初始化 ==========
 function initCamera() {
-    // 1. 初始化透视相机 (Perspective View)
+    // 1. 初始化透视视角 (模拟人眼视角 - 从南校区南门看学校)
     perspectiveCamera = new THREE.PerspectiveCamera(
         60,
         window.innerWidth / window.innerHeight,
         0.1,
         1000
     );
-    perspectiveCamera.position.set(0, 45, -85);
+    // 位置：x=0, y=2.5, z=-200*0.3=-60 (南门外)
+    perspectiveCamera.position.set(0, 2.5, -60);
+    perspectiveCamera.lookAt(0, 2.5, -30); // 看向校内
 
-    // 2. 初始化鸟瞰相机 (Bird View - 正上方俯视)
+    // 2. 初始化鸟瞰视角 (可旋转缩放的自由视角)
     birdCamera = new THREE.PerspectiveCamera(
         60,
         window.innerWidth / window.innerHeight,
         0.1,
         1000
     );
-    // 高度 y=30 (根据场景 SCALE=0.3 调整原需求 y=3 为 y=30 以获得合适范围)
-    birdCamera.position.set(0, 30, -30); 
+    birdCamera.position.set(0, 80, -100); // 较高的俯视位置
     birdCamera.lookAt(0, 0, -30);
 
-    // 默认使用透视相机
+    // 默认使用透视相机 (人眼视角)
     camera = perspectiveCamera;
 }
 
@@ -138,6 +160,11 @@ function initControls() {
     controls.minDistance = 5;
     controls.maxDistance = 200;
     controls.maxPolarAngle = Math.PI / 2.1;
+    
+    // 初始状态下（透视视角）禁用控制器，因为要使用键盘控制
+    if (currentView === 'perspective') {
+        controls.enabled = false;
+    }
 }
 
 // ========== 光照系统初始化 ==========
@@ -239,6 +266,12 @@ function createBuilding(w, h, d, floors, cols, bodyColor, position, name) {
     body.position.y = h / 2;
     body.castShadow = true;
     body.receiveShadow = true;
+    
+    // 存储原始颜色和类型标记，用于交互
+    body.userData.originalColor = bodyMaterial.color.clone();
+    body.userData.isBuildingBody = true;
+    body.userData.parentGroup = group; // 关联父组，方便获取建筑信息
+    
     group.add(body);
 
     // 仅当 cols > 0 时添加窗户
@@ -385,7 +418,7 @@ function createBuildings() {
 
         var labelY = cfg.h + 2.5;
         var label = createBuildingLabel(b.name, b.id || '', new THREE.Vector3(pos.x, labelY, pos.z));
-        buildingsGroup.add(label);
+        labelsGroup.add(label); // 将标签添加到 labelsGroup 而不是 buildingsGroup
     }
 }
 
@@ -657,6 +690,51 @@ function bindEvents() {
     document.getElementById('btn-birdview').addEventListener('click', function() {
         toggleView('bird');
     });
+
+    // 绑定标签显隐按钮事件
+    document.getElementById('btn-toggle-labels').addEventListener('click', function() {
+        toggleLabels();
+    });
+
+    // 绑定重置视角按钮事件
+    document.getElementById('btn-reset').addEventListener('click', function() {
+        resetView();
+    });
+
+    // 鼠标移动事件（用于高亮）
+    window.addEventListener('mousemove', onMouseMove, false);
+
+    // 鼠标双击事件（用于聚焦）
+    window.addEventListener('dblclick', onMouseDoubleClick, false);
+
+    // 键盘按下事件
+    window.addEventListener('keydown', function(e) {
+        if (currentView !== 'perspective') return;
+        switch(e.code) {
+            case 'ArrowUp':
+            case 'KeyW': moveState.forward = true; break;
+            case 'ArrowDown':
+            case 'KeyS': moveState.backward = true; break;
+            case 'ArrowLeft':
+            case 'KeyA': moveState.left = true; break;
+            case 'ArrowRight':
+            case 'KeyD': moveState.right = true; break;
+        }
+    });
+
+    // 键盘抬起事件
+    window.addEventListener('keyup', function(e) {
+        switch(e.code) {
+            case 'ArrowUp':
+            case 'KeyW': moveState.forward = false; break;
+            case 'ArrowDown':
+            case 'KeyS': moveState.backward = false; break;
+            case 'ArrowLeft':
+            case 'KeyA': moveState.left = false; break;
+            case 'ArrowRight':
+            case 'KeyD': moveState.right = false; break;
+        }
+    });
 }
 
 // ========== 窗口大小自适应 ==========
@@ -669,8 +747,41 @@ function onWindowResize() {
 // ========== 渲染循环 ==========
 function animate() {
     requestAnimationFrame(animate);
-    controls.update();
+    
+    // 如果是透视模式，处理键盘移动
+    if (currentView === 'perspective') {
+        updateHumanMovement();
+    } else {
+        controls.update();
+    }
+    
     renderer.render(scene, camera);
+}
+
+/**
+ * 处理人眼视角的移动逻辑
+ */
+function updateHumanMovement() {
+    // 转向逻辑
+    if (moveState.left) {
+        camera.rotation.y -= rotateSpeed; // 修改：从 += 改为 -=
+    }
+    if (moveState.right) {
+        camera.rotation.y += rotateSpeed; // 修改：从 -= 改为 +=
+    }
+
+    // 移动逻辑
+    if (moveState.forward || moveState.backward) {
+        var direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        
+        // 保持水平移动，不随视角仰俯
+        direction.y = 0;
+        direction.normalize();
+
+        var step = moveState.forward ? moveSpeed : -moveSpeed;
+        camera.position.addScaledVector(direction, step);
+    }
 }
 
 // ========== 扩展预留：GLB 模型加载 ==========
@@ -692,33 +803,227 @@ function toggleView(mode) {
     document.getElementById('btn-birdview').classList.toggle('active', mode === 'bird');
 
     if (mode === 'perspective') {
-        // 切换到透视视角
+        // 切换到：透视视角 (人眼模拟 + 键盘控制)
         camera = perspectiveCamera;
-        controls.object = camera; // 重新绑定控制器相机
+        controls.enabled = false; // 禁用轨道控制器，改用键盘控制
         
-        // 恢复控制器限制
-        controls.enableRotate = true;
-        controls.maxPolarAngle = Math.PI / 2.1;
-        controls.minPolarAngle = 0;
-        
-        // 设置一个较好的初始观察角度
-        camera.position.set(0, 45, -85);
-        controls.target.set(0, 0, -30);
+        // 重置到初始位置
+        camera.position.set(0, 2.5, -60);
+        camera.rotation.set(0, Math.PI, 0); // 朝向校内
+        // 修正：场景中 Z 正方向是北校区，Z 负方向是南校区。
+        // 南门在 Z = -50 左右。从 Z=-60 看向 Z=0 是看向北方。
+        camera.lookAt(0, 2.5, -30);
     } else {
-        // 切换到鸟瞰视角
+        // 切换到：鸟瞰视角 (自由旋转缩放)
         camera = birdCamera;
-        controls.object = camera; // 重新绑定控制器相机
+        controls.object = camera;
+        controls.enabled = true; // 启用轨道控制器
         
-        // 锁定旋转：禁止水平旋转和垂直旋转
-        controls.enableRotate = false;
+        controls.enableRotate = true; // 允许旋转
+        controls.maxPolarAngle = Math.PI / 2.1;
         
-        // 强制俯视：设置相机位置和目标
-        camera.position.set(0, 30, -30);
+        camera.position.set(0, 80, -100);
         controls.target.set(0, 0, -30);
     }
     
-    controls.update();
-    console.log('视角已切换至:', mode === 'perspective' ? '透视视角' : '鸟瞰视角');
+    if (controls.enabled) controls.update();
+    console.log('视角已切换至:', mode === 'perspective' ? '人眼透视 (键盘控制)' : '自由鸟瞰 (鼠标控制)');
+}
+
+/**
+ * 鼠标移动事件处理
+ */
+function onMouseMove(event) {
+    // 计算鼠标在屏幕上的归一化坐标 (-1 到 +1)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // 只有在非动画状态下才进行射线检测，提高性能
+    if (!isAnimating) {
+        updateHover();
+    }
+}
+
+/**
+ * 更新鼠标悬停高亮逻辑
+ */
+function updateHover() {
+    raycaster.setFromCamera(mouse, camera);
+    
+    // 检测建筑群中的相交对象
+    var intersects = raycaster.intersectObjects(buildingsGroup.children, true);
+
+    if (intersects.length > 0) {
+        var object = intersects[0].object;
+        
+        // 确保我们高亮的是建筑主体 (body)
+        if (object.userData.isBuildingBody) {
+            if (hoveredObject !== object) {
+                // 恢复之前的对象颜色
+                restoreHoveredColor();
+                
+                // 设置新的高亮对象
+                hoveredObject = object;
+                object.material.color.set(HIGHLIGHT_COLOR);
+                document.body.style.cursor = 'pointer';
+            }
+        } else {
+            restoreHoveredColor();
+        }
+    } else {
+        restoreHoveredColor();
+    }
+}
+
+/**
+ * 恢复高亮对象的颜色
+ */
+function restoreHoveredColor() {
+    if (hoveredObject) {
+        hoveredObject.material.color.copy(hoveredObject.userData.originalColor);
+        hoveredObject = null;
+        document.body.style.cursor = 'default';
+    }
+}
+
+/**
+ * 鼠标双击聚焦事件处理
+ */
+function onMouseDoubleClick(event) {
+    if (isAnimating) return;
+
+    raycaster.setFromCamera(mouse, camera);
+    var intersects = raycaster.intersectObjects(buildingsGroup.children, true);
+
+    if (intersects.length > 0) {
+        var object = intersects[0].object;
+        if (object.userData.isBuildingBody) {
+            var targetGroup = object.userData.parentGroup;
+            focusOnBuilding(targetGroup);
+        }
+    }
+}
+
+/**
+ * 平滑聚焦到指定建筑
+ * @param {THREE.Group} buildingGroup 建筑组对象
+ */
+function focusOnBuilding(buildingGroup) {
+    if (isAnimating) return;
+    
+    // 获取建筑的世界坐标
+    var targetPos = new THREE.Vector3();
+    buildingGroup.getWorldPosition(targetPos);
+    
+    // 计算相机新位置：建筑正前方合适距离 (根据 SCALE=0.3 调整)
+    // 假设在建筑 Z 轴负方向 (看向南) 的位置
+    var offset = new THREE.Vector3(0, 15, -30); 
+    var newCameraPos = targetPos.clone().add(offset);
+    
+    // 执行平滑过渡动画
+    animateCamera(newCameraPos, targetPos);
+}
+
+/**
+ * 相机平滑过渡动画
+ * @param {THREE.Vector3} targetPosition 相机目标位置
+ * @param {THREE.Vector3} targetLookAt 控制器聚焦目标 (建筑中心)
+ */
+function animateCamera(targetPosition, targetLookAt) {
+    isAnimating = true;
+    
+    // 如果当前是透视视角（人眼模式），切换到鸟瞰视角（自由模式）以允许自动移动
+    if (currentView === 'perspective') {
+        toggleView('bird');
+    }
+
+    var startPosition = camera.position.clone();
+    var startTarget = controls.target.clone();
+    
+    var duration = 1000; // 动画时长 1秒
+    var startTime = Date.now();
+
+    function update() {
+        var elapsed = Date.now() - startTime;
+        var progress = Math.min(elapsed / duration, 1);
+        
+        // 使用 EaseInOutQuad 缓动函数使动画更平滑
+        var easeProgress = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+        // 插值位置
+        camera.position.lerpVectors(startPosition, targetPosition, easeProgress);
+        // 插值控制器目标
+        controls.target.lerpVectors(startTarget, targetLookAt, easeProgress);
+        
+        controls.update();
+
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        } else {
+            isAnimating = false;
+        }
+    }
+
+    update();
+}
+
+/**
+ * 重置视角功能实现
+ */
+function resetView() {
+    if (isAnimating) return;
+    
+    // 1. 恢复所有建筑颜色
+    buildingsGroup.traverse(function(child) {
+        if (child.isMesh && child.userData.isBuildingBody) {
+            child.material.color.copy(child.userData.originalColor);
+        }
+    });
+    
+    // 2. 关闭所有信息面板 (如果有的话)
+    if (infoPanel) infoPanel.style.display = 'none';
+    
+    // 3. 平滑回到初始位置
+    var initialPos = new THREE.Vector3(0, 2.5, -60);
+    var initialTarget = new THREE.Vector3(0, 2.5, -30);
+    
+    // 如果已经在透视模式，先临时启用控制器以便动画插值
+    if (currentView === 'perspective') {
+        controls.enabled = true;
+    }
+    
+    animateCamera(initialPos, initialTarget);
+    
+    // 动画结束后（或者直接）同步按钮状态
+    // 注意：animateCamera 内部会调用 toggleView('bird')，
+    // 我们希望最终回到 'perspective'。
+    // 由于 animateCamera 是异步的，我们需要在动画结束后切换。
+    
+    setTimeout(function() {
+        if (currentView !== 'perspective') {
+            toggleView('perspective');
+        }
+    }, 1100); // 略长于动画时间
+    
+    console.log('视角已重置');
+}
+
+/**
+ * 切换建筑标签的显示与隐藏
+ */
+function toggleLabels() {
+    labelsVisible = !labelsVisible;
+    labelsGroup.visible = labelsVisible;
+    
+    var btn = document.getElementById('btn-toggle-labels');
+    if (labelsVisible) {
+        btn.textContent = '隐藏标签';
+        btn.classList.add('active');
+    } else {
+        btn.textContent = '显示标签';
+        btn.classList.remove('active');
+    }
+    console.log('标签状态:', labelsVisible ? '显示' : '隐藏');
 }
 
 // ========== 扩展预留：图层显隐控制 ==========
