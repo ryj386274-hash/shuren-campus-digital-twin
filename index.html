@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浙江树人学院 - 校园数字孪生</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <!-- 信息面板：后续用于点击模型显示详细信息 -->
+    <div class="info-panel" id="info-panel" style="display: none;">
+        <h3 id="info-title"></h3>
+        <p id="info-description"></p>
+    </div>
+
+    <!-- 控制面板：后续用于视角切换、图层显隐 -->
+    <div class="view-controls" id="view-controls" style="display: none;">
+        <!-- 后续扩展：视角切换、图层控制按钮 -->
+    </div>
+
+    <!-- Three.js 核心库（非模块版本，兼容所有浏览器和 file:// 协议） -->
+    <script src="https://unpkg.com/three@0.137.0/build/three.min.js"></script>
+    <!-- OrbitControls 轨道控制器（非模块版本，挂载到 THREE 全局对象） -->
+    <script src="https://unpkg.com/three@0.137.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- 项目主逻辑 -->
+    <script src="js/main.js"></script>
+</body>
+</html>
