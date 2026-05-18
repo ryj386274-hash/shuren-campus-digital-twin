@@ -9,26 +9,233 @@
 <body>
     <div id="canvas-container"></div>
 
-    <!-- 信息面板：后续用于点击模型显示详细信息 -->
-    <div class="info-panel" id="info-panel" style="display: none;">
-        <h3 id="info-title"></h3>
-        <p id="info-description"></p>
-    </div>
-
-    <!-- 控制面板：视角切换与图层控制 -->
     <div class="view-controls" id="view-controls">
-        <button id="btn-perspective" class="control-btn active">透视视角</button>
-        <button id="btn-birdview" class="control-btn">鸟瞰视角</button>
-        <button id="btn-reset" class="control-btn">重置视角</button>
-        <hr style="border: none; border-top: 1px solid #ccc; margin: 4px 0;">
-        <button id="btn-toggle-labels" class="control-btn active">隐藏标签</button>
+
+        <!-- 视角 -->
+        <div class="vc-section" id="vc-view">
+            <div class="vc-section-header" onclick="toggleVC('view')">
+                <span class="vc-section-title">📷 视角</span>
+                <span class="vc-arrow" id="vc-arrow-view">▾</span>
+            </div>
+            <div class="vc-section-body" id="vc-body-view">
+                <button id="btn-perspective" class="control-btn active">透视视角</button>
+                <button id="btn-birdview" class="control-btn">鸟瞰视角</button>
+                <button id="btn-reset" class="control-btn">重置视角</button>
+                <button id="btn-toggle-labels" class="control-btn active">隐藏标签</button>
+            </div>
+        </div>
+
+        <!-- 内容 -->
+        <div class="vc-section" id="vc-content">
+            <div class="vc-section-header" onclick="toggleVC('content')">
+                <span class="vc-section-title">📋 内容</span>
+                <span class="vc-arrow" id="vc-arrow-content">▾</span>
+            </div>
+            <div class="vc-section-body" id="vc-body-content">
+                <button id="btn-toggle-intro" class="control-btn">图文介绍</button>
+                <button id="btn-toggle-layers" class="control-btn">图层切换</button>
+            </div>
+        </div>
+
+        <!-- 操作手册 - 单独一行直接触发 -->
+        <div class="vc-section vc-section-flat" id="vc-manual">
+            <button id="btn-toggle-manual" class="vc-full-btn">📖 操作手册</button>
+        </div>
+
+        <!-- 天气 -->
+        <div class="vc-section" id="vc-weather">
+            <div class="vc-section-header" onclick="toggleVC('weather')">
+                <span class="vc-section-title">🌤️ 天气</span>
+                <span class="vc-arrow" id="vc-arrow-weather">▾</span>
+            </div>
+            <div class="vc-section-body" id="vc-body-weather">
+                <div class="weather-group">
+                    <button id="btn-weather-day" class="control-btn weather-btn active" title="白天">☀️</button>
+                    <button id="btn-weather-night" class="control-btn weather-btn" title="黑夜">🌙</button>
+                    <button id="btn-weather-cloudy" class="control-btn weather-btn" title="阴天">☁️</button>
+                    <button id="btn-weather-rain" class="control-btn weather-btn" title="下雨">🌧️</button>
+                    <button id="btn-weather-snow" class="control-btn weather-btn" title="下雪">❄️</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 声音 -->
+        <div class="vc-section" id="vc-audio">
+            <div class="vc-section-header" onclick="toggleVC('audio')">
+                <span class="vc-section-title">🔊 声音</span>
+                <span class="vc-arrow" id="vc-arrow-audio">▾</span>
+            </div>
+            <div class="vc-section-body" id="vc-body-audio">
+                <div class="audio-channel">
+                    <button id="btn-bgm-toggle" class="control-btn audio-ch-btn" title="背景音乐">🔇</button>
+                    <span class="audio-ch-label">BGM</span>
+                    <input type="range" id="bgm-volume" class="audio-volume" min="0" max="100" value="50">
+                </div>
+                <div class="audio-channel">
+                    <button id="btn-rain-toggle" class="control-btn audio-ch-btn" title="雨声">🔇</button>
+                    <span class="audio-ch-label">雨声</span>
+                    <input type="range" id="rain-volume" class="audio-volume" min="0" max="100" value="50">
+                </div>
+                <div class="audio-channel">
+                    <button id="btn-night-toggle" class="control-btn audio-ch-btn" title="夜声">🔇</button>
+                    <span class="audio-ch-label">夜声</span>
+                    <input type="range" id="night-volume" class="audio-volume" min="0" max="100" value="50">
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- Three.js 核心库（非模块版本，兼容所有浏览器和 file:// 协议） -->
+    <div class="intro-panel" id="intro-panel" style="display: none;">
+        <div class="panel-header">
+            <h3 id="intro-title">校园建筑介绍</h3>
+            <button id="btn-close-intro" class="panel-close-btn">&times;</button>
+        </div>
+        <div class="panel-body" id="intro-body">
+            <div class="intro-hint">点击场景中的建筑查看详细介绍</div>
+        </div>
+    </div>
+
+    <div class="layer-panel" id="layer-panel" style="display: none;">
+        <div class="panel-header">
+            <h3>图层切换</h3>
+            <button id="btn-close-layers" class="panel-close-btn">&times;</button>
+        </div>
+        <div class="panel-body">
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="layer-buildings" checked> 建筑群
+                </label>
+            </div>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="layer-trees" checked> 树木植被
+                </label>
+            </div>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="layer-roads" checked> 道路
+                </label>
+            </div>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="layer-labels" checked> 标签
+                </label>
+            </div>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="layer-ai-models" checked> 导入模型
+                </label>
+            </div>
+            <hr class="layer-divider">
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="layer-shadows" checked> 阴影
+                </label>
+            </div>
+            <div class="layer-item">
+                <label class="layer-label">
+                    <input type="checkbox" id="layer-fog" checked> 雾效
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="manual-panel" id="manual-panel" style="display: none;">
+        <div class="panel-header">
+            <h3>📖 操作说明手册</h3>
+            <button id="btn-close-manual" class="panel-close-btn">&times;</button>
+        </div>
+        <div class="panel-body manual-body">
+            <div class="manual-section">
+                <div class="manual-section-title">🖱️ 鼠标操作</div>
+                <div class="manual-row"><span class="manual-key">左键拖拽</span><span class="manual-desc">旋转视角（鸟瞰模式）</span></div>
+                <div class="manual-row"><span class="manual-key">右键拖拽</span><span class="manual-desc">平移视角</span></div>
+                <div class="manual-row"><span class="manual-key">滚轮</span><span class="manual-desc">缩放场景 / 缩放选中模型</span></div>
+                <div class="manual-row"><span class="manual-key">双击建筑</span><span class="manual-desc">聚焦建筑并查看介绍</span></div>
+            </div>
+            <div class="manual-section">
+                <div class="manual-section-title">⌨️ 键盘操作（透视模式）</div>
+                <div class="manual-row"><span class="manual-key">W / ↑</span><span class="manual-desc">前进</span></div>
+                <div class="manual-row"><span class="manual-key">S / ↓</span><span class="manual-desc">后退</span></div>
+                <div class="manual-row"><span class="manual-key">A / ←</span><span class="manual-desc">左转</span></div>
+                <div class="manual-row"><span class="manual-key">D / →</span><span class="manual-desc">右转</span></div>
+            </div>
+            <div class="manual-section">
+                <div class="manual-section-title">📦 导入模型操作</div>
+                <div class="manual-row"><span class="manual-key">单击模型</span><span class="manual-desc">选中（绿色边框）</span></div>
+                <div class="manual-row"><span class="manual-key">拖拽模型</span><span class="manual-desc">移动位置</span></div>
+                <div class="manual-row"><span class="manual-key">滚轮</span><span class="manual-desc">缩放选中模型大小</span></div>
+                <div class="manual-row"><span class="manual-key">R</span><span class="manual-desc">旋转模型 15°</span></div>
+                <div class="manual-row"><span class="manual-key">Delete</span><span class="manual-desc">删除选中模型</span></div>
+                <div class="manual-row"><span class="manual-key">Esc</span><span class="manual-desc">取消选中</span></div>
+            </div>
+            <div class="manual-section">
+                <div class="manual-section-title">🚶 人物控制</div>
+                <div class="manual-row"><span class="manual-key">点击女生</span><span class="manual-desc">选中女生（粉色）</span></div>
+                <div class="manual-row"><span class="manual-key">点击男生</span><span class="manual-desc">选中男生（蓝色）</span></div>
+                <div class="manual-row"><span class="manual-key">方向键</span><span class="manual-desc">控制女生移动</span></div>
+                <div class="manual-row"><span class="manual-key">WASD</span><span class="manual-desc">控制男生移动</span></div>
+                <div class="manual-row"><span class="manual-key">点击空白</span><span class="manual-desc">取消选中人物</span></div>
+                <div class="manual-text">• 女生只能在南校区范围内移动<br>• 男生只能在北校区范围内移动<br>• 人物会自动避开建筑物障碍</div>
+            </div>
+            <div class="manual-section">
+                <div class="manual-section-title">🌤️ 天气与音效</div>
+                <div class="manual-row"><span class="manual-key">☀️🌙☁️🌧️❄️</span><span class="manual-desc">切换白天/黑夜/阴天/下雨/下雪</span></div>
+                <div class="manual-row"><span class="manual-key">🔇/🔊</span><span class="manual-desc">开关BGM/雨声/夜声</span></div>
+                <div class="manual-row"><span class="manual-key">音量滑块</span><span class="manual-desc">独立调节各通道音量</span></div>
+            </div>
+            <div class="manual-section">
+                <div class="manual-section-title">📁 模型导入方式</div>
+                <div class="manual-text">将 GLB/GLTF 文件放入项目根目录的 <b>3Dmoxing</b> 文件夹中，启动服务器后自动加载到场景。模型位置和大小会自动保存，刷新页面后保持不变。</div>
+            </div>
+            <div class="manual-section">
+                <div class="manual-section-title">💡 使用提示</div>
+                <div class="manual-text">• 鸟瞰视角下可自由旋转、平移、缩放场景<br>• 透视视角模拟人在校园中行走<br>• 图文介绍面板中点击建筑名可自动飞到对应位置<br>• 图层切换可控制各元素的显示与隐藏</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 人物对话气泡 -->
+    <div id="speech-bubble" class="speech-bubble"></div>
+
+    <!-- 人物选中提示 -->
+    <div id="character-hint" class="character-hint" style="display: none;"></div>
+
+    <script>
+        // 折叠面板状态管理（默认展开视角和天气）
+        var vcExpanded = { view: true, content: false, weather: true, audio: false };
+
+        function toggleVC(key) {
+            var body = document.getElementById('vc-body-' + key);
+            var arrow = document.getElementById('vc-arrow-' + key);
+            if (vcExpanded[key]) {
+                body.style.display = 'none';
+                arrow.textContent = '▸';
+                vcExpanded[key] = false;
+            } else {
+                body.style.display = '';
+                arrow.textContent = '▾';
+                vcExpanded[key] = true;
+            }
+        }
+
+        // 页面加载完成后根据初始状态设置折叠状态
+        document.addEventListener('DOMContentLoaded', function() {
+            for (var key in vcExpanded) {
+                if (!vcExpanded[key]) {
+                    var body = document.getElementById('vc-body-' + key);
+                    var arrow = document.getElementById('vc-arrow-' + key);
+                    if (body) body.style.display = 'none';
+                    if (arrow) arrow.textContent = '▸';
+                }
+            }
+        });
+    </script>
     <script src="https://unpkg.com/three@0.137.0/build/three.min.js"></script>
-    <!-- OrbitControls 轨道控制器（非模块版本，挂载到 THREE 全局对象） -->
     <script src="https://unpkg.com/three@0.137.0/examples/js/controls/OrbitControls.js"></script>
-    <!-- 项目主逻辑 -->
+    <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/DRACOLoader.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
